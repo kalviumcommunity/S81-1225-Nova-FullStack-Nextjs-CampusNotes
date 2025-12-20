@@ -17,3 +17,4 @@
 
 ### Reflection
 If the app had 10x more users, we would reduce SSR usage and rely more on SSG and ISR to lower server load and improve scalability.
+
