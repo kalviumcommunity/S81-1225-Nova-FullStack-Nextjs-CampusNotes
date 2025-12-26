@@ -2,7 +2,7 @@
 
 Use this checklist to guide reviews before approving a PR. Reviewers should verify the items below and add comments when issues are found.
 
-## Functionality
+## Functionality 
 - [ ] Feature works and matches the description/requirements
 - [ ] Edge cases handled and validated
 - [ ] Manual test steps are included in the PR
