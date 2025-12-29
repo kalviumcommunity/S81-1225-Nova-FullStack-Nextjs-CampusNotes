@@ -42,3 +42,36 @@ Custom rules prevent console logs, enforce semicolons, and standardize quotes.
 ### Pre-Commit Hooks
 Husky and lint-staged ensure that all code is linted and formatted before commits.  
 This prevents broken or inconsistent code from entering the repository and improves team collaboration.
+
+
+## Environment Variable Management
+
+This project follows secure and professional practices for managing environment variables and secrets in a Next.js application.
+
+### Environment Files Used
+
+- **.env.local**
+  - Stores actual credentials such as database URLs, API keys, and secrets.
+  - Used only in local development.
+  - Never committed to version control.
+
+- **.env.example**
+  - Serves as a template listing all required environment variables.
+  - Contains placeholder values and comments explaining each variable.
+  - Helps new developers replicate the setup safely.
+
+---
+
+### Server-side vs Client-side Variables
+
+Next.js exposes environment variables to the browser **only if they are prefixed with `NEXT_PUBLIC_`**.
+
+- **Server-side only variables**
+  - `DATABASE_URL`
+  - `REDIS_URL`
+  - `NEXTAUTH_SECRET`
+  - `AWS_S3_BUCKET_NAME`
+
+  These are accessed only on the server using:
+  ```js
+  process.env.DATABASE_URL
