@@ -131,3 +131,20 @@ The following protection rules are enforced on the `main` branch to maintain cod
 ## Why This Workflow Matters
 
 This workflow significantly improves team efficiency and code quality. By requiring code reviews, we catch bugs early and share knowledge across the team. Branch protection rules prevent breaking changes from reaching production, while automated checks ensure consistency and reduce technical debt. Clear branching conventions make it easy to understand what each branch does at a glance, improving collaboration. Together, these practices accelerate delivery speed while maintaining high code standards and reducing the risk of production incidents
+
+
+## Summary
+Briefly explain the purpose of this PR.
+
+## Changes Made
+- Clearly list the key changes.
+
+## Screenshots / Evidence
+(Add screenshots, logs, or links if applicable)
+
+## Checklist
+- [ ] Code builds successfully
+- [ ] Lint and tests pass
+- [ ] Reviewed by at least one teammate
+- [ ] Linked to corresponding issue
+- [ ] No sensitive data exposed
