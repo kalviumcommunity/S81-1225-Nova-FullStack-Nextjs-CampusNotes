@@ -1,0 +1,115 @@
+// This is your Prisma schema file for Campus Notes application
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and profile management
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  name      String
+  password  String
+  avatar    String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relations
+  courses   CourseEnrollment[]
+  notes     Note[]
+  folders   Folder[]
+  tags      Tag[]
+}
+
+// Course model for organizing notes by subject/course
+model Course {
+  id        Int       @id @default(autoincrement())
+  title     String
+  code      String    @unique
+  description String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relations
+  enrollments CourseEnrollment[]
+  notes       Note[]
+}
+
+// CourseEnrollment model for user-course relationships
+model CourseEnrollment {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  courseId  Int
+  enrolledAt DateTime  @default(now())
+  
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, courseId])
+}
+
+// Folder model for organizing notes hierarchically
+model Folder {
+  id        Int       @id @default(autoincrement())
+  name      String
+  userId    Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     Note[]
+}
+
+// Note model for storing user notes
+model Note {
+  id        Int       @id @default(autoincrement())
+  title     String
+  content   String
+  userId    Int
+  courseId  Int
+  folderId  Int?
+  isPinned  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  folder    Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  tags      TagOnNote[]
+}
+
+// Tag model for categorizing notes
+model Tag {
+  id        Int       @id @default(autoincrement())
+  name      String
+  userId    Int
+  createdAt DateTime  @default(now())
+  
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     TagOnNote[]
+  
+  @@unique([userId, name])
+}
+
+// TagOnNote model for many-to-many relationship between notes and tags
+model TagOnNote {
+  id        Int       @id @default(autoincrement())
+  noteId    Int
+  tagId     Int
+  
+  // Relations
+  note      Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@unique([noteId, tagId])
+}
