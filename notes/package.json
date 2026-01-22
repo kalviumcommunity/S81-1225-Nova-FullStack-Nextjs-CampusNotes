@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "prepare": "husky install",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
@@ -28,18 +27,14 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
     "prisma": "^6.19.2",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
     "dotenv": "^17.2.3",
-    "eslint": "^9.39.2",
-    "eslint-config-next": "^16.0.10",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "husky": "^8.0.0",
     "lint-staged": "^16.2.7",
     "pg": "^8.16.3",
     "prettier": "^3.7.4",
-    "prisma": "^7.2.0",
-    "tailwindcss": "^4",
     "tsx": "^4.21.0"
   },
   "lint-staged": {
@@ -47,5 +42,8 @@
       "eslint --fix",
       "prettier --write"
     ]
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

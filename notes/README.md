@@ -697,3 +697,854 @@ However, raw SQL still wins in specific scenarios:
 
 ---
 
+## Database Migrations & Seed Scripts (Concept-7b)
+
+### Understanding Database Migrations
+
+A migration is a versioned record of changes to your database schema. It captures what changed (added tables, modified fields, etc.) and ensures consistency across development, staging, and production environments.
+
+**Why Migrations Matter:**
+- ✅ Version control for database schema (like Git for code)
+- ✅ Reproducibility across team members and environments
+- ✅ Safe rollback capability if issues arise
+- ✅ Audit trail of all schema changes
+- ✅ Prevents manual SQL errors and inconsistencies
+
+### Migration Workflow
+
+#### 1. **Create and Run Your First Migration**
+
+After updating `prisma/schema.prisma` with your models, create the initial migration:
+
+```bash
+npx prisma migrate dev --name init_schema
+```
+
+**What Prisma does:**
+1. Generates SQL migration files in `prisma/migrations/[timestamp]_init_schema/`
+2. Applies the migration to your PostgreSQL database
+3. Updates the `_prisma_migrations` table to track migration history
+4. Regenerates the Prisma Client with updated types
+
+**Example Output:**
+```
+✔ Successfully created 7 new tables
+✔ Migration: 20260122_init_schema (XXms)
+✔ Generated Prisma Client (v6.19.2)
+```
+
+#### 2. **Understanding Generated Migration Files**
+
+Each migration creates an SQL file. For Campus Notes, `init_schema.sql` contains:
+
+```sql
+-- CreateTable User
+CREATE TABLE "User" (
+  "id" SERIAL NOT NULL PRIMARY KEY,
+  "email" TEXT NOT NULL UNIQUE,
+  "name" TEXT NOT NULL,
+  "password" TEXT NOT NULL,
+  "avatar" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable Course
+CREATE TABLE "Course" (
+  "id" SERIAL NOT NULL PRIMARY KEY,
+  "title" TEXT NOT NULL,
+  "code" TEXT NOT NULL UNIQUE,
+  "description" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL
+);
+
+-- [Additional tables for Note, Folder, Tag, CourseEnrollment, TagOnNote...]
+```
+
+**Key Observations:**
+- All tables created atomically in one transaction
+- Foreign keys with cascade delete policies
+- Unique constraints for data integrity
+- Timestamps for audit trails
+
+#### 3. **Add or Modify Models and Create New Migrations**
+
+When you need to add a new feature (e.g., a Notification model):
+
+```prisma
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+```
+
+Create a new migration:
+
+```bash
+npx prisma migrate dev --name add_notification_table
+```
+
+This creates a separate migration file capturing only the new changes.
+
+#### 4. **Reset and Reapply Migrations (Development Only)**
+
+To clear your local database and start fresh:
+
+```bash
+npx prisma migrate reset
+```
+
+**Warning:** This is destructive! Only use in development. Prisma will:
+1. Drop the entire database
+2. Create a new empty database
+3. Re-apply all migrations in order
+4. Optionally run seed script
+
+### Database Seeding
+
+Seeding populates your database with initial data needed for development and testing.
+
+#### **Our Seed Script: `prisma/seed.ts`**
+
+The seed script uses `upsert` for idempotency — running it multiple times won't create duplicates:
+
+```typescript
+// Users (with upsert for idempotency)
+const alice = await prisma.user.upsert({
+  where: { email: 'alice@campusnotes.com' },
+  update: {},
+  create: {
+    email: 'alice@campusnotes.com',
+    name: 'Alice Johnson',
+    password: 'hashed_password_123',
+  },
+});
+
+// Courses (3 sample courses)
+const csAlgorithms = await prisma.course.upsert({
+  where: { code: 'CS101' },
+  update: {},
+  create: {
+    code: 'CS101',
+    title: 'Introduction to Algorithms',
+    description: 'Comprehensive study of algorithm design',
+  },
+});
+
+// Course Enrollments (user-course relationships)
+await prisma.courseEnrollment.upsert({
+  where: { userId_courseId: { userId: alice.id, courseId: csAlgorithms.id } },
+  update: {},
+  create: {
+    userId: alice.id,
+    courseId: csAlgorithms.id,
+  },
+});
+
+// Folders, Tags, Notes, and Tag associations follow the same pattern
+```
+
+**Why Upsert?**
+- Idempotent: Safe to run multiple times
+- Creates if doesn't exist, updates if it does
+- Prevents duplicate key errors
+- Perfect for seeding!
+
+#### **Running the Seed Script**
+
+```bash
+# Option 1: Explicit seed command
+npm run db:seed
+
+# Option 2: Via Prisma CLI
+npx prisma db seed
+
+# Option 3: Auto-seed on migration reset
+npx prisma migrate reset  # This auto-runs seed at the end
+```
+
+**Sample Output:**
+```
+🌱 Starting database seeding...
+
+👤 Creating users...
+✅ Created/Updated 3 users
+
+📚 Creating courses...
+✅ Created/Updated 3 courses
+
+📝 Creating course enrollments...
+✅ Created/Updated 4 course enrollments
+
+📁 Creating folders...
+✅ Created/Updated 3 folders
+
+🏷️  Creating tags...
+✅ Created/Updated 3 tags
+
+📖 Creating notes...
+✅ Created/Updated 4 notes
+
+🔗 Creating note-tag associations...
+✅ Created/Updated 4 note-tag associations
+
+═══════════════════════════════════════════════════════
+✨ Database seeding completed successfully! ✨
+═══════════════════════════════════════════════════════
+
+📊 Seeded Data Summary:
+   • Users: 3
+   • Courses: 3
+   • Course Enrollments: 4
+   • Folders: 3
+   • Notes: 4
+   • Tags: 3
+   • Note-Tag Associations: 4
+
+💡 Pro Tip: Run "npm run db:studio" to view the data in Prisma Studio!
+```
+
+#### **Verifying Seeded Data with Prisma Studio**
+
+Prisma Studio is a GUI for viewing and editing your database:
+
+```bash
+npm run db:studio
+# Opens: http://localhost:5555
+```
+
+Features:
+- Browse all tables and records
+- Filter and search data
+- Edit records directly
+- Run queries
+- Perfect for verification!
+
+### Idempotency & Safe Seeding
+
+**Idempotency Principle:** Running the seed script multiple times produces the same result.
+
+Our implementation ensures this:
+
+```typescript
+await prisma.tag.upsert({
+  where: { userId_name: { userId: alice.id, name: 'Important' } },
+  update: {},  // Don't change if exists
+  create: {    // Create only if doesn't exist
+    name: 'Important',
+    userId: alice.id,
+  },
+});
+```
+
+**Test Idempotency:**
+```bash
+npm run db:seed
+# Run again - should see "Updated" messages, not "Created"
+npm run db:seed
+# No errors, data unchanged ✓
+```
+
+### Migration Rollback & Recovery
+
+#### **Rolling Back the Last Migration**
+
+```bash
+# Rollback to previous migration (breaks forward-only migrations)
+npx prisma migrate resolve --rolled-back <migration_name>
+```
+
+**Important:** Prisma expects migrations to be applied sequentially. Better approach:
+
+#### **Recommended: Create a New Migration**
+
+If a migration went wrong:
+
+```typescript
+// In new migration, undo the problematic change
+// For example, if you added a field you didn't want:
+
+// Add a new migration to remove it
+ALTER TABLE "Note" DROP COLUMN "unwantedField";
+```
+
+#### **For Development: Reset Everything**
+
+```bash
+# Clean slate - drops, rebuilds, reseeds
+npx prisma migrate reset
+```
+
+### Production Data Protection
+
+**Critical Steps Before Running Migrations in Production:**
+
+1. **Full Database Backup**
+   ```bash
+   # PostgreSQL backup
+   pg_dump -U postgres campusnotes > backup_$(date +%Y%m%d_%H%M%S).sql
+   ```
+
+2. **Test in Staging First**
+   - Run migration in staging environment
+   - Verify data integrity
+   - Confirm performance impact
+   - Test rollback procedure
+
+3. **Planned Downtime Window**
+   - Announce maintenance window
+   - Disable critical features during migration
+   - Have rollback plan ready
+
+4. **Blue-Green Deployment**
+   - Keep old database running (blue)
+   - Create new database with migration (green)
+   - Switch traffic after verification
+   - Keep blue as fallback
+
+5. **Zero-Downtime Strategies**
+   - Use feature flags to toggle new schema
+   - Dual-write pattern (write to both old and new)
+   - Gradual rollout with canary testing
+
+6. **Monitoring & Alerts**
+   - Monitor database performance
+   - Set up alerts for errors
+   - Have DBA on standby
+   - Document all steps
+
+7. **Verification Checklist**
+   - ✅ All tables created successfully
+   - ✅ Foreign keys established
+   - ✅ Indexes created
+   - ✅ Data integrity checks passed
+   - ✅ Performance metrics acceptable
+   - ✅ Application works with new schema
+
+### Database Setup Commands Reference
+
+**Quick Setup:**
+```bash
+# Start PostgreSQL via Docker
+docker-compose up -d db
+
+# Wait for database to be ready
+sleep 5
+
+# Run initial migration and seed
+npm run db:migrate -- --name init_schema
+npm run db:seed
+
+# Verify in Prisma Studio
+npm run db:studio
+```
+
+**Useful Commands:**
+```bash
+# Generate Prisma Client types
+npm run db:generate
+
+# Create new migration
+npm run db:migrate -- --name add_feature_name
+
+# Reset database (development only)
+npm run db:reset
+
+# Open Prisma Studio
+npm run db:studio
+
+# Check migration status
+npx prisma migrate status
+```
+
+### Migration Best Practices
+
+1. **One Migration Per Change** - Keep migrations small and focused
+2. **Always Test Locally First** - Catch errors before production
+3. **Write Idempotent Seeds** - Use `upsert` to prevent duplicates
+4. **Document Migration Purpose** - Use clear names like `add_notification_table`
+5. **Version Control Migrations** - Commit `.prisma/migrations/` folder
+6. **Never Edit Applied Migrations** - Create new migration instead
+7. **Test Rollback Procedure** - Ensure you can recover if needed
+8. **Monitor Post-Migration** - Watch for errors and performance issues
+
+### Production Data Protection Reflection
+
+**Q: If your app were live in production, what steps would you take before running a migration to make sure no data is lost or corrupted?**
+
+**A:** Running migrations in production requires extreme caution. Here's my approach:
+
+1. **Comprehensive Backup Strategy**
+   - Full database backup to encrypted off-site storage
+   - Transaction logs for point-in-time recovery
+   - Test restore procedure regularly
+
+2. **Staging Environment Validation**
+   - Mirror production data (anonymized) to staging
+   - Run migration in staging first
+   - Verify all data integrity with detailed queries
+   - Load test to ensure performance
+
+3. **Careful Planning**
+   - Schedule during low-traffic window (2-4 AM)
+   - Communicate maintenance window to users
+   - Have rollback plan documented and tested
+   - Ensure DBA and engineering team available
+
+4. **Execution Protocol**
+   - Enable read-only mode before migration
+   - Create pre-migration backup
+   - Run migration in transaction (if possible)
+   - Verify data integrity post-migration
+   - Monitor for 24 hours after
+
+5. **Monitoring & Rollback**
+   - Set up performance alerts
+   - Monitor error logs in real-time
+   - Have quick rollback procedure ready
+   - Be prepared to restore from backup
+
+6. **Zero-Downtime Techniques**
+   - Use blue-green deployment
+   - Feature flags to control schema usage
+   - Gradual rollout with canary testing
+   - Keep backward compatibility
+
+**Key Principle:** Production migrations should be boring, well-tested, and have multiple safety nets. Better to spend 2 hours planning than 2 days recovering from data loss!
+
+---
+
+## Database Migrations & Seed Scripts (Concept-8)
+
+### Understanding Database Migrations
+
+Database migrations are version-controlled changes to your database schema. They ensure:
+- **Consistency**: Same database structure across all environments (local, staging, production)
+- **Reversibility**: Ability to rollback to previous states if needed
+- **Traceability**: Complete history of schema changes over time
+- **Team Collaboration**: Everyone applies the same changes in the same order
+
+### Migration Workflow
+
+#### 1. **Create Your First Migration**
+
+After defining your schema in `prisma/schema.prisma`, generate a migration:
+
+```bash
+npx prisma migrate dev --name init_schema
+```
+
+This command:
+- Creates a new migration file in `prisma/migrations/[timestamp]_init_schema/`
+- Generates the SQL to transform your database
+- Applies the migration to your local database
+- Generates the Prisma Client with updated types
+
+**Output Example:**
+```
+✔ Created migration: prisma/migrations/20260122074531_init_schema
+
+The following migration(s) have been created and applied:
+
+migrations/
+  └─ 20260122074531_init_schema/
+    └─ migration.sql
+
+✔ Generated Prisma Client (v6.19.2)
+```
+
+#### 2. **Making Schema Changes**
+
+When you need to add or modify models:
+
+1. Update `prisma/schema.prisma`
+2. Run migration command:
+   ```bash
+   npx prisma migrate dev --name add_new_feature
+   ```
+3. Prisma generates SQL, applies it, and regenerates types
+
+**Example: Adding a new field to User model:**
+
+```prisma
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  name      String
+  password  String
+  avatar    String?
+  role      String    @default("student")  // New field
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relations...
+}
+```
+
+Then:
+```bash
+npx prisma migrate dev --name add_role_to_user
+```
+
+#### 3. **Viewing Migrations**
+
+All migrations are stored in `prisma/migrations/` with timestamps:
+
+```
+prisma/
+├── migrations/
+│   ├── migration_lock.toml         # Locks migration engine
+│   ├── 20260122074531_init_schema/
+│   │   └── migration.sql           # Initial schema SQL
+│   └── 20260122074532_add_role_to_user/
+│       └── migration.sql           # Add role field SQL
+└── schema.prisma
+```
+
+### Database Seeding
+
+#### What is Seeding?
+
+Seeding is the process of inserting initial (or test) data into your database. Benefits:
+- **Consistent test data**: Everyone has the same starting dataset
+- **Development efficiency**: No need to manually enter data
+- **Production safety**: Predictable production setup
+- **Idempotency**: Re-running seed doesn't create duplicates
+
+#### Our Seed Script
+
+Located in `prisma/seed.ts`, it creates sample data including:
+
+```typescript
+// 3 Sample Users
+- Alice Johnson (alice@campusnotes.com)
+- Bob Smith (bob@campusnotes.com)
+- Charlie Brown (charlie@campusnotes.com)
+
+// 3 Sample Courses
+- CS101: Introduction to Algorithms
+- CS201: Database Systems
+- WEB101: Full Stack Web Development
+
+// 4 Sample Notes with course associations
+- Big O Notation Explained
+- ACID Properties in Databases
+- React Hooks Tutorial
+- SQL JOIN Operations
+
+// 3 Custom Tags
+- Important
+- Review Later
+- Urgent
+
+// 4 Note-Tag Associations
+```
+
+#### Running the Seed Script
+
+```bash
+# Option 1: Using npm script
+npm run db:seed
+
+# Option 2: Using Prisma directly
+npx prisma db seed
+
+# Option 3: Combined with migration
+npx prisma migrate dev --name init_schema
+# (Automatically runs seed if configured)
+```
+
+**Seed Output Example:**
+```
+🌱 Starting database seeding...
+
+👤 Creating users...
+✅ Created/Updated 3 users
+
+📚 Creating courses...
+✅ Created/Updated 3 courses
+
+📝 Creating course enrollments...
+✅ Created/Updated 4 course enrollments
+
+📁 Creating folders...
+✅ Created/Updated 3 folders
+
+🏷️  Creating tags...
+✅ Created/Updated 3 tags
+
+📖 Creating notes...
+✅ Created/Updated 4 notes
+
+🔗 Creating note-tag associations...
+✅ Created/Updated 4 note-tag associations
+
+═══════════════════════════════════════════════════════
+✨ Database seeding completed successfully! ✨
+═══════════════════════════════════════════════════════
+
+📊 Seeded Data Summary:
+   • Users: 3
+   • Courses: 3
+   • Course Enrollments: 4
+   • Folders: 3
+   • Notes: 4
+   • Tags: 3
+   • Note-Tag Associations: 4
+
+💡 Pro Tip: Run "npm run db:studio" to view the data in Prisma Studio!
+```
+
+### Using Prisma Studio
+
+Prisma Studio provides a GUI for viewing and editing your database:
+
+```bash
+npm run db:studio
+```
+
+Features:
+- View all records in each table
+- Create, edit, or delete records
+- Test relationships visually
+- Verify seed data was applied correctly
+- No SQL knowledge needed
+
+### Resetting Your Database
+
+To start fresh (clear all data and reapply migrations):
+
+```bash
+npx prisma migrate reset
+```
+
+**⚠️ WARNING:** This command:
+- Drops the entire database
+- Recreates it from scratch
+- Reapplies all migrations in order
+- Runs seed script again
+- **All data is permanently deleted**
+
+**Use Cases:**
+- Development: When you've corrupted data
+- Testing: To get a clean slate
+- CI/CD: To test migration chain end-to-end
+
+### Idempotency in Seeding
+
+Our seed script uses `upsert` (Update or Insert) to ensure idempotency:
+
+```typescript
+const user = await prisma.user.upsert({
+  where: { email: 'alice@campusnotes.com' },
+  update: {},              // No changes if exists
+  create: {                // Only create if doesn't exist
+    email: 'alice@campusnotes.com',
+    name: 'Alice Johnson',
+    // ...
+  },
+});
+```
+
+**Benefits:**
+- ✅ Run seed multiple times safely - no duplicates
+- ✅ Update existing data if needed
+- ✅ Safe for production scenarios
+
+### Production Migration Strategy
+
+**Before running migrations in production, follow these steps:**
+
+1. **Backup Your Database**
+   ```bash
+   # PostgreSQL backup example
+   pg_dump mydb > backup_$(date +%Y%m%d_%H%M%S).sql
+   ```
+
+2. **Test Migrations in Staging**
+   - Run migrations in staging environment first
+   - Verify data integrity
+   - Test rollback procedures
+
+3. **Schedule a Maintenance Window**
+   - Inform users about downtime
+   - Clear active connections
+   - Perform backup
+   - Apply migration
+   - Run verification tests
+
+4. **Monitor After Migration**
+   - Check application logs
+   - Verify data consistency
+   - Monitor database performance
+   - Have rollback plan ready
+
+5. **Keep Rollback Ready**
+   - If something goes wrong, restore from backup
+   - Review error logs
+   - Document the issue
+   - Plan fix and retest
+
+### Rollback Strategy
+
+**For PostgreSQL, backup restoration:**
+
+```bash
+# Restore from backup
+psql mydb < backup_20260122.sql
+
+# Or use Prisma to reset and re-seed
+npx prisma migrate resolve --rolled-back [migration_name]
+```
+
+### Safe Migration Practices
+
+✅ **DO:**
+- Name migrations descriptively: `add_role_to_user`, not `update_schema`
+- Test migrations locally before applying to production
+- Keep migrations small and focused
+- Document complex migrations in commit messages
+- Always backup production before migrations
+- Run migrations during low-traffic periods
+
+❌ **DON'T:**
+- Make multiple unrelated changes in one migration
+- Manually edit generated migration SQL (except for comments)
+- Skip testing migrations
+- Apply migrations directly to production without staging
+- Delete migration files (even if unused)
+- Mix schema changes with data transformations
+
+### Common Migration Scenarios
+
+#### Adding a New Model
+```bash
+# Update schema.prisma with new model
+npx prisma migrate dev --name add_comment_model
+```
+
+#### Adding a Field with Default Value
+```prisma
+model Note {
+  // ... existing fields ...
+  status String @default("draft")  // New field
+}
+```
+
+#### Creating Indices for Performance
+```prisma
+model Note {
+  // ... fields ...
+  @@index([userId])    // Speed up queries
+  @@index([courseId])
+}
+```
+
+#### Making a Field Required (Careful!)
+```prisma
+model User {
+  // Before: email String?
+  // After:  email String   // Add migration to set default values first
+}
+```
+
+### Verification Checklist
+
+After running migrations and seed:
+
+- [ ] Migration files created in `prisma/migrations/`
+- [ ] Database tables exist with correct schema
+- [ ] All relationships properly created
+- [ ] Seed data appears in database
+- [ ] Prisma Client generated successfully
+- [ ] Can query data with type safety
+- [ ] Prisma Studio displays all records
+- [ ] No data loss or corruption
+
+### Database Commands Reference
+
+```bash
+# Development workflow
+npm run db:migrate     # Create and apply migration
+npm run db:seed        # Run seed script
+npm run db:studio      # Open Prisma Studio GUI
+npm run db:reset       # Reset database to clean state
+
+# Advanced
+npx prisma migrate dev --name feature_name      # Create named migration
+npx prisma migrate deploy                        # Apply migrations (production)
+npx prisma migrate resolve --rolled-back name   # Mark migration as rolled back
+npx prisma migration resolve --applied name     # Mark migration as applied
+npx prisma db push                              # Prototype: push schema to DB
+npx prisma db pull                              # Introspect: pull schema from DB
+```
+
+### Creative Reflection: Production Migration Safety
+
+**Q: If your app were live in production, what steps would you take before running a migration to make sure no data is lost or corrupted?**
+
+**A:** Production migrations are critical operations that require careful planning:
+
+**Pre-Migration Checklist:**
+
+1. **Backup Everything**
+   - Create full database backup
+   - Export backup to off-site storage
+   - Test backup restoration procedure
+   - Document backup location and access
+
+2. **Test in Staging**
+   - Clone production database to staging
+   - Apply migration to staging environment
+   - Run full test suite
+   - Verify data integrity
+   - Check performance impact
+   - Simulate rollback if needed
+
+3. **Plan Maintenance Window**
+   - Schedule during low-traffic period
+   - Notify users 24-48 hours in advance
+   - Have rollback team ready
+   - Prepare communication template
+
+4. **Preparation**
+   - Brief migration team on plan
+   - Review migration SQL manually
+   - Prepare rollback scripts
+   - Set up monitoring dashboards
+   - Verify database connectivity
+
+5. **During Migration**
+   - Stop application (prevent new queries)
+   - Clear connection pool
+   - Run migration (with timeout limits)
+   - Verify schema changes applied
+   - Run data validation checks
+   - Re-enable application gradually
+
+6. **Post-Migration**
+   - Monitor error logs for 2 hours
+   - Check database performance metrics
+   - Verify all application features work
+   - Document actual migration time
+   - Collect metrics for future migrations
+
+**Why This Matters:**
+- Data loss = business impact
+- Downtime costs money
+- User trust is fragile
+- Regulatory compliance (GDPR, HIPAA, etc.)
+- Financial/legal implications
+
+**Key Insight:** With great schema changes come great responsibility. The 30 minutes spent planning prevents days of disaster recovery.
+
+---
+
