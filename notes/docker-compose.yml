@@ -42,43 +42,46 @@ services:
       retries: 5
 
   # Next.js Application Service
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: campusnotes-app
-    restart: unless-stopped
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${APP_PORT:-3000}
-      # Database configuration
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-campusnotes}
-      # Redis configuration
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
-      # Next.js specific
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
-    ports:
-      - "${APP_PORT:-3000}:3000"
-    volumes:
-      # Mount source code for development (optional, comment out for production)
-      # - ./src:/app/src
-      # - ./public:/app/public
-      - app_logs:/app/logs
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - campusnotes-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+  # The application service is disabled because a required Dockerfile is not
+  # present in this repository/PR. Once a Dockerfile is added, uncomment this
+  # block to enable the app service again.
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: campusnotes-app
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: ${NODE_ENV:-production}
+  #     PORT: ${APP_PORT:-3000}
+  #     # Database configuration
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-campusnotes}
+  #     # Redis configuration
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
+  #     # Next.js specific
+  #     NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+  #   ports:
+  #     - "${APP_PORT:-3000}:3000"
+  #   volumes:
+  #     # Mount source code for development (optional, comment out for production)
+  #     # - ./src:/app/src
+  #     # - ./public:/app/public
+  #     - app_logs:/app/logs
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - campusnotes-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
 
 # Volumes for data persistence
 volumes:
