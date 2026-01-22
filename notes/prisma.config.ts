@@ -10,5 +10,9 @@ export default defineConfig({
   engine: "classic",
   datasource: {
     url: env("DATABASE_URL"),
+  datasource: {
+    url:
+      process.env.DATABASE_URL ||
+      "postgresql://postgres:password@127.0.0.1:5433/mydb?schema=public",
   },
 });
